@@ -2,22 +2,58 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 )
 
+const (
+	Name    = "shell"
+	Version = "0.1.0"
+)
+
 type Config struct {
-	FilePath string
+	InputPath string
 }
 
 func main() {
-	filePath := "data/emptydisk.txt"
-	config := &Config{filePath}
+	var isHelp bool
+	var isVersion bool
+	var inputPath string
+	flag.BoolVar(&isHelp, "h", false, "print help message")
+	flag.BoolVar(&isHelp, "H", false, "print help message")
+	flag.BoolVar(&isHelp, "?", false, "print help message")
+	flag.BoolVar(&isHelp, "help", false, "print help message")
+	flag.BoolVar(&isVersion, "v", false, "print version")
+	flag.BoolVar(&isVersion, "V", false, "print version")
+	flag.BoolVar(&isVersion, "version", false, "print version")
+	flag.StringVar(&inputPath, "i", "", "input file path")
+	flag.Parse()
+
+	if isHelp {
+		flag.CommandLine.Usage()
+		return
+	}
+
+	if isVersion {
+		fmt.Printf("%s %s\n", Name, Version)
+		return
+	}
+
+	config := &Config{inputPath}
 	Run(config)
 }
 
 func Run(config *Config) {
-	data, err := os.ReadFile(config.FilePath)
+	var err error
+	var data []byte
+	if config.InputPath == "" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(config.InputPath)
+	}
+
 	if err != nil {
 		panic(err)
 	}
