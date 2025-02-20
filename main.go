@@ -9,18 +9,54 @@ import (
 )
 
 const (
-	Name    = "shell"
-	Version = "0.1.0"
+	Name       = "shell"
+	Version    = "0.1.0"
+	numBytes   = 32
+	numColumns = 64
+	header     = `XX:                1               2               3
+XX:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF`
+	numRows = 32
 )
 
 type Config struct {
 	InputPath string
 }
 
+type cluster interface {
+}
+
+type emptyCluster struct {
+	nextEmpty int
+}
+
+type damagedCluster struct {
+	nextDamaged int
+}
+
+type fileDataCluster struct {
+	content  string
+	nextData int
+}
+
+type fileHeaderCluster struct {
+	name       string
+	content    string
+	nextHeader int
+	nextData   int
+}
+
+type rootCluster struct {
+	name    string
+	empty   int
+	damaged int
+	headers int
+}
+
 func main() {
 	var isHelp bool
 	var isVersion bool
 	var inputPath string
+
 	flag.BoolVar(&isHelp, "h", false, "print help message")
 	flag.BoolVar(&isHelp, "H", false, "print help message")
 	flag.BoolVar(&isHelp, "?", false, "print help message")
@@ -74,11 +110,21 @@ func trim(data []byte) [][]byte {
 }
 
 func prettyPrint(raw [][]byte) {
-	const header string = `XX:                1               2               3
-XX:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF`
-
 	fmt.Println(header)
 	for i, line := range raw {
 		fmt.Printf("%02X:%s\n", i, string(append(line[1:], []byte("0")...)))
 	}
+}
+
+func rawToCluster(raw []byte) cluster {
+	return &emptyCluster{0}
+}
+
+func rawToClusters(raw [][]byte) []cluster {
+	clusters := make([]cluster, numRows)
+	for _, line := range raw {
+		clusters = append(clusters, rawToCluster(line))
+	}
+
+	return clusters
 }
