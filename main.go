@@ -24,12 +24,14 @@ type ShellAction int
 
 const (
 	Disk = iota
+	Type
 	Dir
 )
 
 type Config struct {
 	InputPath string
 	Action    ShellAction
+	TypePath  string
 }
 
 type cluster interface {
@@ -66,6 +68,8 @@ func main() {
 	var isHelp bool
 	var isVersion bool
 	var isDir bool
+	var isType bool
+	var typePath string
 	var inputPath string
 
 	flag.BoolVar(&isHelp, "h", false, "print help message")
@@ -76,6 +80,7 @@ func main() {
 	flag.BoolVar(&isVersion, "V", false, "print version")
 	flag.BoolVar(&isVersion, "version", false, "print version")
 	flag.BoolVar(&isDir, "dir", false, "print files in root directory")
+	flag.StringVar(&typePath, "type", "", "prints contents of file")
 	flag.StringVar(&inputPath, "i", "", "input file path")
 	flag.Parse()
 
@@ -89,14 +94,20 @@ func main() {
 		return
 	}
 
+	if typePath != "" {
+		isType = true
+	}
+
 	var action ShellAction
 	if isDir {
 		action = Dir
+	} else if isType {
+		action = Type
 	} else {
 		action = Disk
 	}
 
-	config := &Config{inputPath, action}
+	config := &Config{inputPath, action, typePath}
 	Run(config)
 }
 
@@ -120,6 +131,8 @@ func Run(config *Config) {
 	switch config.Action {
 	case Disk:
 		printDisk(raw)
+	case Type:
+		printContent(clusters, config.TypePath)
 	case Dir:
 		printFiles(clusters)
 	}
@@ -179,6 +192,35 @@ func printDisk(raw [][]byte) {
 	fmt.Println(header)
 	for i := range raw {
 		fmt.Printf("%02X:%s\n", i, stringData[i])
+	}
+}
+
+func printContent(clusters []cluster, fileName string) {
+	fileFound := false
+	for _, cluster := range clusters {
+		fileHeader, ok := cluster.(*fileHeaderCluster)
+		if ok && fileHeader.name == fileName {
+			fmt.Print(fileHeader.content)
+			if fileHeader.nextData != 0 {
+				fileData, ok := clusters[fileHeader.nextData].(*fileDataCluster)
+				if ok {
+					fmt.Print(fileData.content)
+					for fileData.nextData != 0 {
+						fileData, ok := clusters[fileData.nextData].(*fileDataCluster)
+						if ok {
+							fmt.Print(fileData.content)
+						}
+					}
+				}
+			}
+			fmt.Println()
+			fileFound = true
+			break
+		}
+	}
+
+	if !fileFound {
+		fmt.Fprintf(os.Stderr, "[Error] File not found: %s\n", fileName)
 	}
 }
 
